@@ -5,6 +5,14 @@ import { prisma } from "~/db.server";
 
 export type { User } from "@prisma/client";
 
+export async function findOrCreate({ email }: { email: User["email"] }) {
+  return prisma.user.upsert({
+    where: { email },
+    update: {},
+    create: { email },
+  });
+}
+
 export async function getUserById(id: User["id"]) {
   return prisma.user.findUnique({ where: { id } });
 }
