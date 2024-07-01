@@ -1,22 +1,39 @@
-import { LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { LoaderFunctionArgs, defer, json } from "@remix-run/node";
+import { Await, Form, useLoaderData } from "@remix-run/react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { chat } from "~/models/llm.server";
+import { useEventSource } from "remix-utils/sse/react";
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const prompt = url.searchParams.get("prompt");
+  return json({ prompt: url.searchParams.get("prompt") });
+}
 
-  if (!prompt) {
-    return json({ response: "Please provide a prompt" }, { status: 400 });
-  }
+function usePrompt(prompt: string | null) {
+  if (!prompt) return "";
+  const message = useEventSource(`/sse/chat?prompt=${prompt}`, {
+    event: "message",
+  });
 
-  const response = await chat(prompt);
+  const [messageComplete, setMessageComplete] = useState("");
 
-  return json({ response });
+  useEffect(() => {
+    if (message && message !== "UNKNOWN_EVENT_DATA") {
+      setMessageComplete((prevMessage) => prevMessage + message);
+    }
+  }, [message]);
+
+  return messageComplete;
 }
 
 export default function ChatRoute() {
-  const data = useLoaderData<typeof loader>();
+  const { prompt } = useLoaderData<typeof loader>();
 
-  return <div>{data.response}</div>;
+  const message = usePrompt(prompt);
+
+  return (
+    <div>
+      <div>{message}</div>
+    </div>
+  );
 }
